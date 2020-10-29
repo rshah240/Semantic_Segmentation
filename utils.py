@@ -1,136 +1,140 @@
 # Utilities Module
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import cv2
 from torchvision import transforms as T
 from PIL import Image
 
-class Encoder(nn.Module):
-    def __init__(self,input_features, output_features, blocks = 2,
-                 drop_rate = 0.5):
+class Conv2DBatchNorm(nn.Module):
+    def __init__(self, in_channels, out_channels, k_size,
+                 stride, padding, bias=True, batch_norm = True):
         """
-        :param input_features: number of Input_features
-        :param output_features: number of Output Features
-        :param blocks: number of Blocks
-        :param drop_rate:dropout Rate
+
+        :param in_channels: input channels to the convolution layer
+        :param out_channels:  output channels to the convolution layer
+        :param k_size: kernel size
+        :param stride: stride size
+        :param padding: padding size
+        :param bias: boolean value to include bias or not
+        :param batch_norm: boolean value to include batch normalization or not
         """
-        super(Encoder, self).__init__()
-        layers = [nn.Conv2d(input_features,output_features,3,1,1),
-                  nn.BatchNorm2d(output_features),
-                  nn.ReLU(inplace=True)]
-
-        if blocks > 1:
-            layers += [nn.Conv2d(input_features, output_features, 3,1,1),
-                       nn.BatchNorm2d(output_features),
-                       nn.ReLU(inplace=True)]
-            if blocks == 3:
-                layers += [nn.Dropout(drop_rate)]
-
-        self.features = nn.Sequential(*layers)
+        super(Conv2DBatchNorm, self).__init__()
+        conv1 = nn.Conv2d(in_channels, out_channels, k_size, stride, padding, bias = bias)
+        if batch_norm:
+            self.unit = nn.Sequential(conv1, nn.BatchNorm2d(out_channels))
+        else:
+            self.unit = nn.Sequential(conv1)
 
     def forward(self, x):
-        output = self.features(x)
-        return F.max_pool2d(output, 2, 2, return_indices = True), output.size()
-
-
-
-
-class Decoder(nn.Module):
-    def __init__(self, input_features, output_features, blocks = 2, drop_rate = 0.5):
-        """
-
-        :param input_features: number of Input Features
-        :param output_features: number of Output Features
-        :param blocks: number of Blocks
-        :param drop_rate:Dropout Rate
-        """
-        super(Decoder, self).__init__()
-        layers = [nn.Conv2d(input_features, output_features, 3, 1, 1),
-                  nn.BatchNorm2d(output_features),
-                  nn.ReLU(inplace=True)]
-
-        if blocks > 1:
-            layers += [nn.Conv2d(input_features, output_features, 3,1,1),
-                       nn.BatchNorm2d(output_features),
-                       nn.ReLU(inplace=True)]
-            if blocks == 3:
-                layers += [nn.Dropout(drop_rate)]
-
-        self.features(*nn.Sequential())
-
-    def forward(self, x, indices, size):
-        unpooled = F.max_unpool2d(x, indices, 2,2,0,size)
-        return self.features(unpooled)
-
-
-
-class Segnet(nn.Module):
-    def __init__(self, num_classes, input_features, drop_rate = 0.5):
-        """
-
-        :param num_classes: output classes
-        :param input_features: input features
-        :param drop_rate: dropout regularization
-        """
-        super(Segnet, self).__init__()
-        # Encoder Layer
-        self.encoder_1 = Encoder(input_features = input_features, output_features=64, blocks=2)
-        self.encoder_2 = Encoder(input_features = 64, output_features=128, blocks = 2 )
-        self.encoder_3 = Encoder(input_features = 128, output_features= 256, blocks = 3)
-        self.encoder_4 = Encoder(input_features = 256, output_features = 512, blocks = 3)
-        self.encoder_5 = Encoder(input_features = 512, output_features= 512, blocks = 3)
-
-
-        # Decoder Layers
-        self.decoder_1 = Decoder(input_features = 512, output_features = 512, blocks = 3)
-        self.decoder_2 = Decoder(input_features = 512, output_features= 256, blocks = 3)
-        self.decoder_3 = Decoder(input_features = 256, output_features = 128, blocks = 3)
-        self.decoder_4 = Decoder(input_features = 128, output_features = 64, blocks = 2)
-        self.decoder_5 = Decoder(input_features = 64, output_features = 64, blocks = 1)
-
-        # final classifiers
-        self.classifier = nn.Conv2d(64,num_classes,3,1,1)
-
-    def forward(self, x):
-        indices = []
-        unpool_sizes = []
-
-        #Encoder Layers
-        (x, ind), size = self.encoder_1(x)
-        indices.append(ind)
-        unpool_sizes.append(size)
-
-        (x, ind), size = self.encoder_2(x)
-        indices.append(ind)
-        unpool_sizes.append(size)
-
-        (x, ind), size = self.encoder_3(x)
-        indices.append(ind)
-        unpool_sizes.append(size)
-
-        (x, ind), size = self.encoder_4(x)
-        indices.append(ind)
-        unpool_sizes.append(size)
-
-        (x,ind), size = self.encoder_5(x)
-        indices.append(ind)
-        unpool_sizes.append(size)
-
-        #Decoder Layers
-        indices = indices.reverse()
-        unpool_sizes = unpool_sizes.reverse()
-
-        x = self.decoder_1(x,indices[0], unpool_sizes[0])
-        x = self.decoder_2(x, indices[1], unpool_sizes[1])
-        x = self.decoder_3(x, indices[2], unpool_sizes[2])
-        x = self.decoder_4(x, indices[3], unpool_sizes[3])
-        x = self.decoder_5(x, indices[4], unpool_sizes[4])
-
-        x = self.classifier(x)
+        x = self.unit(x)
         return x
 
+class segnetencoder3(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        """
+        :param in_channels: input channels
+        :param out_channels: out channels
+        """
+        super(segnetencoder3, self).__init__()
+        self.conv1 = Conv2DBatchNorm(in_channels, out_channels, 3, 1, 1)
+        self.conv2 = Conv2DBatchNorm(out_channels, out_channels, 3, 1,1)
+        self.conv3 = Conv2DBatchNorm(out_channels, out_channels, 3, 1, 1)
+        self.maxpool = nn.MaxPool2d(2,2,return_indices=True)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        unpooled_shape = x.size()
+        x, indices = self.maxpool(x)
+        return x, indices, unpooled_shape
+
+
+class segnetencoder2(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        """
+        :param in_channels:
+        :param out_channels:
+        """
+        super(segnetencoder2, self).__init__()
+        self.conv1 = Conv2DBatchNorm(in_channels, out_channels, 3, 1, 1)
+        self.conv2 = Conv2DBatchNorm(out_channels, out_channels, 3, 1,1)
+        self.maxpool = nn.MaxPool2d(2,2,return_indices=True)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        unpooled_shape = x.size()
+        x, indices = self.maxpool(x)
+        return x, indices, unpooled_shape
+
+class segnetdecoder2(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        """
+        :param in_channels: input channels to the decoder layer
+        :param out_channels: output channels to the decoder layer
+        """
+        super(segnetdecoder2, self).__init__()
+        self.conv1 = Conv2DBatchNorm(in_channels , out_channels, 3, 1, 1)
+        self.conv2 = Conv2DBatchNorm(out_channels, out_channels, 3, 1, 1)
+        self.unpool = nn.MaxUnpool2d(2,2)
+    def forward(self, inputs, indices, output_shape):
+        x = self.unpool(input=inputs, indices=indices,output_size=output_shape)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        return x
+
+class segnetdecoder3(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        """
+
+        :param in_channels: input channels to the decoder layer
+        :param out_channels: output channels to the decoder layer
+        """
+        super(segnetdecoder3, self).__init__()
+        self.conv1 = Conv2DBatchNorm(in_channels , out_channels, 3, 1, 1)
+        self.conv2 = Conv2DBatchNorm(out_channels, out_channels, 3, 1, 1)
+        self.conv3 = Conv2DBatchNorm(out_channels, out_channels, 3,1,1)
+        self.unpool = nn.MaxUnpool2d(2,2)
+
+    def forward(self, inputs, indices, output_shape):
+        x = self.unpool(input=inputs, indices=indices,output_size=output_shape)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        return x
+
+class Segnet(nn.Module):
+    def __init__(self,in_channels = 3,classes = 20):
+        super(Segnet, self).__init__()
+
+        self.encoder1 = segnetencoder2(in_channels, 64)
+        self.encoder2 = segnetencoder2(64, 128)
+        self.encoder3 = segnetencoder3(128, 256)
+        self.encoder4 = segnetencoder3(256,512)
+        self.encoder5 = segnetencoder3(512, 512)
+
+        self.decoder5 = segnetdecoder3(512, 512)
+        self.decoder4 = segnetdecoder3(512,256)
+        self.decoder3 = segnetdecoder3(256, 128)
+        self.decoder2 = segnetdecoder2(128, 64)
+        self.decoder1 = segnetdecoder2(64, classes)
+
+    def forward(self, x):
+
+        enc1, indices_1, unpool_shape1 = self.encoder1(x)
+        enc2, indices_2, unpool_shape2 = self.encoder2(enc1)
+        enc3, indices_3, unpool_shape3 = self.encoder3(enc2)
+        enc4, indices_4, unpool_shape4 = self.encoder4(enc3)
+        enc5, indices_5, unpool_shape5 = self.encoder5(enc4)
+
+        dc5 = self.decoder5(enc5, indices_5, unpool_shape5)
+        dc4 = self.decoder4(dc5, indices_4, unpool_shape4)
+        dc3 = self.decoder3(dc4, indices_3, unpool_shape3)
+        dc2 = self.decoder2(dc3, indices_2, unpool_shape2)
+        dc1 = self.decoder1(dc2, indices_1, unpool_shape1)
+
+        return dc1
 
 class DroneDataset(Dataset):
 

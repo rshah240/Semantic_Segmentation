@@ -4,13 +4,17 @@ import torch.nn as nn
 from utils import Segnet, DroneDataset
 from torch.utils.data import DataLoader
 import hyperparmeters
+import os
 
 train_on_gpu = torch.cuda.is_available()
 
 def get_data_loader():
+    X = list(os.listdir('./semantic_drone_dataset/original_images'))
+    X = [i.strip('.jpg') for i in X]
     dataset = DroneDataset(img_path='./semantic_drone_dataset/original_images', mask_path='./semantic_drone_dataset/label_images_semantic',
-                           mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-    train_loader = DataLoader(dataset, batch_size=hyperparmeters.batch_size, shuffle = True)
+                           X = X, mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+
+    train_loader = DataLoader(dataset, batch_size=hyperparmeters.batch_size)
     return train_loader
 
 def train():

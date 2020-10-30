@@ -5,6 +5,13 @@ from torch.utils.data import Dataset, DataLoader
 import cv2
 from torchvision import transforms as T
 from PIL import Image
+import os
+from torchvision.models import vgg16
+
+vgg = vgg16(pretrained=True)
+train_on_gpu = torch.cuda.is_available()
+if train_on_gpu:
+    vgg.cuda()
 
 class Conv2DBatchNorm(nn.Module):
     def __init__(self, in_channels, out_channels, k_size,
@@ -61,6 +68,7 @@ class segnetencoder2(nn.Module):
         self.conv1 = Conv2DBatchNorm(in_channels, out_channels, 3, 1, 1)
         self.conv2 = Conv2DBatchNorm(out_channels, out_channels, 3, 1,1)
         self.maxpool = nn.MaxPool2d(2,2,return_indices=True)
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
@@ -121,13 +129,13 @@ class Segnet(nn.Module):
         self.decoder1 = segnetdecoder2(64, classes)
 
     def forward(self, x):
-
+        # Encoder
         enc1, indices_1, unpool_shape1 = self.encoder1(x)
         enc2, indices_2, unpool_shape2 = self.encoder2(enc1)
         enc3, indices_3, unpool_shape3 = self.encoder3(enc2)
         enc4, indices_4, unpool_shape4 = self.encoder4(enc3)
         enc5, indices_5, unpool_shape5 = self.encoder5(enc4)
-
+        # Decoder
         dc5 = self.decoder5(enc5, indices_5, unpool_shape5)
         dc4 = self.decoder4(dc5, indices_4, unpool_shape4)
         dc3 = self.decoder3(dc4, indices_3, unpool_shape3)
@@ -135,6 +143,42 @@ class Segnet(nn.Module):
         dc1 = self.decoder1(dc2, indices_1, unpool_shape1)
 
         return dc1
+
+    def init_vgg16_params(self):
+        blocks = [self.encoder1, self.encoder2, self.encoder3, self.encoder4, self.encoder5]
+
+        features = list(vgg.features.children())
+
+        vgg_layers = []
+        for _layer in features:
+            if isinstance(_layer, nn.Conv2d):
+                vgg_layers.append(_layer)
+
+        merged_layers = []
+        for idx, conv_block in enumerate(blocks):
+            if idx < 2:
+                units  = [conv_block.conv1.unit, conv_block.conv2.unit]
+
+            else:
+                units = [
+                    conv_block.conv1.unit,
+                    conv_block.conv2.unit,
+                    conv_block.conv3.unit
+                ]
+            for _unit in units:
+                for _layer in _unit:
+                    if isinstance(_layer, nn.Conv2d):
+                        merged_layers.append(_layer)
+
+        assert len(vgg_layers) == len(merged_layers)
+
+        for l1,l2 in zip(vgg_layers, merged_layers):
+            if isinstance(l1, nn.Conv2d) and isinstance(l2, nn.Conv2d):
+                assert l1.weight.size() == l2.weight.size()
+                assert l1.bias.size() == l2.bias.size()
+                l2.weight.data = l1.weight.data
+                l2.bias.data = l1.bias.data
+
 
 class DroneDataset(Dataset):
 
@@ -156,9 +200,11 @@ class DroneDataset(Dataset):
         :param idx: idx of the mask and the image
         :return: get item per index
         """
-        img = cv2.imread(self.image_path + self.X[idx] + '.jpg')
+        path_image = os.path.join(self.image_path, self.X[idx] + '.jpg')
+        path_mask = os.path.join(self.mask_path, self.X[idx] + '.png')
+        img = cv2.imread(path_image)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        mask = cv2.imread(self.mask_path + self.X[idx] + '.png', cv2.IMREAD_GRAYSCALE)
+        mask = cv2.imread(path_mask, cv2.IMREAD_GRAYSCALE)
         img = cv2.resize(img, (224,224))
         mask = cv2.resize(mask, (224,224))
         if self.transform is not None:
@@ -174,6 +220,7 @@ class DroneDataset(Dataset):
 
         mask = torch.from_numpy(mask).long()
         return img, mask
+
 
 
 

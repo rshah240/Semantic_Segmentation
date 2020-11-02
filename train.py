@@ -5,6 +5,7 @@ from utils import Segnet, DroneDataset
 from torch.utils.data import DataLoader
 import hyperparmeters
 import os
+from torch.utils.tensorboard import SummaryWriter
 
 train_on_gpu = torch.cuda.is_available()
 
@@ -18,16 +19,28 @@ def get_data_loader():
     return train_loader
 
 def train():
+    writer = SummaryWriter("logs/Semantic_Segmentation_Experiment_1")
     model = Segnet()
     model.init_vgg16_params()
+    train_loader = get_data_loader()
     if train_on_gpu:
         model.cuda()
+    Encoder_Layers = [model.encoder1, model.encoder2, model.encoder3, model.encoder4, model.encoder5]
+
+    # Freezing Encoder Layers
+    for i in Encoder_Layers:
+        for param in i.parameters():
+            param.requires_grad = False
+
     optimizer = optim.Adam(model.parameters(), hyperparmeters.lr)
     criterion = nn.CrossEntropyLoss()
-    train_loader = get_data_loader()
     epochs = hyperparmeters.epochs
     losses = []
+    images,masks = next(iter(train_loader))
+    images = images.cuda()
+    writer.add_graph(model,images)
     for i in range(epochs):
+        model.train()
         for batch_i,(images,masks) in enumerate(train_loader):
             if train_on_gpu:
                 images = images.cuda()
@@ -38,8 +51,15 @@ def train():
             loss.backward()
             optimizer.step()
             losses.append(loss.item())
+        writer.add_scalar('Training_loss',sum(losses)/(i+1),(i+1))
         if i % 10 == 0:
-            print("Epochs : {}/{} Loss: {.2f}".format(i,epochs, loss.item()))
+            print("Epochs : {}/{} Loss: {}".format(i+1,epochs, loss.item()))
+    writer.close()
+    print("Saving Model")
+    PATH = './Semantic_Segmentation.pth'
+    torch.save(model.state_dict(), PATH)
+    print("Finished Training")
+
 
 if __name__ == "__main__":
     train()

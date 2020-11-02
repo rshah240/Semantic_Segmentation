@@ -19,9 +19,9 @@ def get_data_loader():
 
 def train():
     model = Segnet()
+    model.init_vgg16_params()
     if train_on_gpu:
         model.cuda()
-    model.init_vgg16_params()
     optimizer = optim.Adam(model.parameters(), hyperparmeters.lr)
     criterion = nn.CrossEntropyLoss()
     train_loader = get_data_loader()
@@ -32,7 +32,6 @@ def train():
             if train_on_gpu:
                 images = images.cuda()
                 masks = masks.cuda()
-
             optimizer.zero_grad()
             predicted_mask = model(images)
             loss = criterion(predicted_mask, masks)
@@ -41,6 +40,7 @@ def train():
             losses.append(loss.item())
         if i % 10 == 0:
             print("Epochs : {}/{} Loss: {.2f}".format(i,epochs, loss.item()))
+
 if __name__ == "__main__":
     train()
 

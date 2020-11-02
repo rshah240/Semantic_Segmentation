@@ -1,6 +1,7 @@
 # Utilities Module
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import cv2
 from torchvision import transforms as T
@@ -113,7 +114,7 @@ class segnetdecoder3(nn.Module):
         return x
 
 class Segnet(nn.Module):
-    def __init__(self,in_channels = 3,classes = 20):
+    def __init__(self,in_channels = 3,classes = 23):
         super(Segnet, self).__init__()
 
         self.encoder1 = segnetencoder2(in_channels, 64)
@@ -220,6 +221,8 @@ class DroneDataset(Dataset):
 
         mask = torch.from_numpy(mask).long()
         return img, mask
+
+        
 
 
 

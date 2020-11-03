@@ -19,11 +19,18 @@ def get_data_loader():
     train_loader = DataLoader(dataset, batch_size=hyperparmeters.batch_size)
     return train_loader
 
-def train():
+def train(retraining = False):
+    PATH = './Semantic_Segmentation.pth'
     writer = SummaryWriter("logs/Semantic_Segmentation_Experiment_1")
     model = Segnet()
-    # Initialising Encoder with vgg16 parameters
-    model.init_vgg16_params()
+
+    if retraining:
+        # Training the model from the last checkpoint
+        model_config = torch.load(PATH)
+        model.load_state_dict(model_config['state_dict'])
+    else:
+        # Initialising Encoder with vgg16 parameters
+        model.init_vgg16_params()
     train_loader = get_data_loader()
     if train_on_gpu:
         model.cuda()
@@ -55,17 +62,17 @@ def train():
             losses.append(loss.item())
         writer.add_scalar('Training_loss',sum(losses)/(i+1),(i+1))
         if i % 10 == 0:
-            print("Epochs : {}/{} Loss: {:.2f}".format(i,epochs, loss.item()))
+            print("Epochs : {}/{} Loss: {:.2f}".format(i,epochs,loss.item()))
     writer.close()
     print("Saving Model")
-    PATH = './Semantic_Segmentation.pth'
+
     model_config = {'state_dict': model.state_dict(),'epochs': epochs,'losses': losses}
     torch.save(model_config, PATH)
     print("Finished Training")
 
 
 if __name__ == "__main__":
-    train()
+    train(True)
 
 
 

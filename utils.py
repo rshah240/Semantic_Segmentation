@@ -1,13 +1,13 @@
 # Utilities Module
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import cv2
 from torchvision import transforms as T
 from PIL import Image
 import os
 from torchvision.models import vgg16
+import hyperparmeters
 
 vgg = vgg16(pretrained=True)
 train_on_gpu = torch.cuda.is_available()
@@ -182,6 +182,7 @@ class Segnet(nn.Module):
                 l2.bias.data = l1.bias.data
 
 
+
 class DroneDataset(Dataset):
 
     def __init__(self, img_path, mask_path,X, mean, std, transform=None):
@@ -225,7 +226,15 @@ class DroneDataset(Dataset):
 
         
 
+def get_data_loader():
+    """Function to return Data Loader"""
+    X = list(os.listdir('./semantic_drone_dataset/original_images'))
+    X = [i.strip('.jpg') for i in X]
+    dataset = DroneDataset(img_path='./semantic_drone_dataset/original_images', mask_path='./semantic_drone_dataset/label_images_semantic',
+                           X = X, mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
 
+    train_loader = DataLoader(dataset, batch_size=hyperparmeters.batch_size)
+    return train_loader
 
 
 

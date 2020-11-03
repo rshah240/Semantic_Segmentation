@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 train_on_gpu = torch.cuda.is_available()
 
 def get_data_loader():
+    """Function to return Data Loader"""
     X = list(os.listdir('./semantic_drone_dataset/original_images'))
     X = [i.strip('.jpg') for i in X]
     dataset = DroneDataset(img_path='./semantic_drone_dataset/original_images', mask_path='./semantic_drone_dataset/label_images_semantic',
@@ -21,6 +22,7 @@ def get_data_loader():
 def train():
     writer = SummaryWriter("logs/Semantic_Segmentation_Experiment_1")
     model = Segnet()
+    # Initialising Encoder with vgg16 parameters
     model.init_vgg16_params()
     train_loader = get_data_loader()
     if train_on_gpu:
@@ -53,11 +55,12 @@ def train():
             losses.append(loss.item())
         writer.add_scalar('Training_loss',sum(losses)/(i+1),(i+1))
         if i % 10 == 0:
-            print("Epochs : {}/{} Loss: {}".format(i+1,epochs, loss.item()))
+            print("Epochs : {}/{} Loss: {:.2f}".format(i,epochs, loss.item()))
     writer.close()
     print("Saving Model")
     PATH = './Semantic_Segmentation.pth'
-    torch.save(model.state_dict(), PATH)
+    model_config = {'state_dict': model.state_dict(),'epochs': epochs,'losses': losses}
+    torch.save(model_config, PATH)
     print("Finished Training")
 
 

@@ -114,6 +114,7 @@ class segnetdecoder3(nn.Module):
         return x
 
 class Segnet(nn.Module):
+    """Segnet Architecture Class for Semantic Segmentation"""
     def __init__(self,in_channels = 3,classes = 23):
         super(Segnet, self).__init__()
 

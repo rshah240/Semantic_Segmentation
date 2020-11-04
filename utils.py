@@ -8,11 +8,48 @@ from PIL import Image
 import os
 from torchvision.models import vgg16
 import hyperparmeters
+import torch.nn.functional as F
 
 vgg = vgg16(pretrained=True)
 """train_on_gpu = torch.cuda.is_available()
 if train_on_gpu:
     vgg.cuda()"""
+
+class Unet_EncoderBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, dropout=False):
+        super(Unet_EncoderBlock, self).__init__()
+        layers = [
+            nn.Conv2d(in_channels, out_channels, kernel_size=3),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        ]
+        if dropout:
+            layers.append(nn.Dropout(p=0.5))
+        layers.append(nn.MaxPool2d(kernel_size=2,stride=2))
+        self.encode = nn.Sequential(*layers)
+    def forward(self, x):
+        return self.encode(x)
+
+class Unet_DecoderBlock(nn.Module):
+    def __init__(self, in_channels, middle_channels, out_channels):
+        super(Unet_DecoderBlock, self).__init__()
+        layers = [
+            nn.Conv2d(in_channels, middle_channels, kernel_size=3),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(middle_channels, middle_channels, kernel_size=3),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(middle_channels, out_channels, kernel_size=2, stride = 2)
+        ]
+        self.decode = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.decode(x)
+
 
 class Conv2DBatchNorm(nn.Module):
     def __init__(self, in_channels, out_channels, k_size,
@@ -225,7 +262,54 @@ class DroneDataset(Dataset):
         mask = torch.from_numpy(mask).long()
         return img, mask
 
-        
+class UNet(nn.Module):
+    def __init__(self,num_classes):
+        super(UNet, self).__init__()
+        self.encoder1 = Unet_EncoderBlock(3, 64)
+        self.encoder2 = Unet_EncoderBlock(64, 128)
+        self.encoder3 = Unet_EncoderBlock(128, 256)
+        self.encoder4 = Unet_EncoderBlock(256, 512, dropout=True)
+
+        self.center = Unet_DecoderBlock(512,1024,512)
+        self.decoder4 = Unet_DecoderBlock(1024, 512, 256)
+        self.decoder3 = Unet_DecoderBlock(512, 256, 128)
+        self.decoder2 = Unet_DecoderBlock(256, 128, 64)
+
+        self.decoder1 = nn.Sequential(
+            nn.Conv2d(128,64,kernel_size=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True)
+        )
+        self.final = nn.Conv2d(64, num_classes, kernel_size=1)
+
+    def forward(self, x):
+        enc1 = self.encoder1(x)
+        enc2 = self.encoder2(enc1)
+        enc3 = self.encoder3(enc2)
+        enc4 = self.encoder4(enc3)
+
+        center = self.center(enc4)
+        dec4 = self.decoder4(torch.cat([center, F.upsample(enc4, center.size()[2:],mode='bilinear')],dim=1))
+        dec3 = self.decoder3(torch.cat([dec4, F.upsample(enc3, dec4.size()[2:], mode='bilinear')],dim=1))
+        dec2 = self.decoder2(torch.cat([dec3, F.upsample(enc2, dec3.size()[2:], mode='bilinear')],dim=1))
+        dec1 = self.decoder1(torch.cat([dec2, F.upsample(enc1, dec2.size()[2:], mode = 'bilinear')],dim=1))
+        final = self.final(dec1)
+
+        return F.upsample(final, x.size()[2:], mode='bilinear')
+
+    def initialize_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+                nn.init.kaiming_normal(module.weight)
+                if module.bias is not None:
+                    module.bias.data.zero_()
+                elif isinstance(module, nn.BatchNorm2d):
+                    module.weight.data.fill_(1)
+                    module.bias.data.zero_()
+
 
 def get_data_loader():
     """Function to return Data Loader"""

@@ -44,10 +44,10 @@ class Unet_DecoderBlock(nn.Module):
         super(Unet_DecoderBlock, self).__init__()
         layers = [
             nn.Conv2d(in_channels, middle_channels, kernel_size=3),
-            nn.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(middle_channels, middle_channels, kernel_size=3),
-            nn.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(middle_channels),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(middle_channels, out_channels, kernel_size=2, stride = 2)
         ]
@@ -313,7 +313,7 @@ class UNet(nn.Module):
     def initialize_weights(self):
         for module in self.modules():
             if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
-                nn.init.kaiming_normal(module.weight)
+                nn.init.kaiming_normal_(module.weight)
                 if module.bias is not None:
                     module.bias.data.zero_()
                 elif isinstance(module, nn.BatchNorm2d):

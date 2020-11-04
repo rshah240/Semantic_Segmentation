@@ -35,6 +35,12 @@ class Unet_EncoderBlock(nn.Module):
 
 class Unet_DecoderBlock(nn.Module):
     def __init__(self, in_channels, middle_channels, out_channels):
+        """
+
+        :param in_channels: input channels
+        :param middle_channels: input to Second Convolution Layer
+        :param out_channels: Output Channels
+        """
         super(Unet_DecoderBlock, self).__init__()
         layers = [
             nn.Conv2d(in_channels, middle_channels, kernel_size=3),
@@ -263,7 +269,11 @@ class DroneDataset(Dataset):
         return img, mask
 
 class UNet(nn.Module):
+    """Unet Architecture for Semantic Segmentation"""
     def __init__(self,num_classes):
+        """
+        :param num_classes: Number of classes for  Semantic Segmentation
+        """
         super(UNet, self).__init__()
         self.encoder1 = Unet_EncoderBlock(3, 64)
         self.encoder2 = Unet_EncoderBlock(64, 128)

@@ -10,9 +10,9 @@ from torchvision.models import vgg16
 import hyperparmeters
 
 vgg = vgg16(pretrained=True)
-train_on_gpu = torch.cuda.is_available()
+"""train_on_gpu = torch.cuda.is_available()
 if train_on_gpu:
-    vgg.cuda()
+    vgg.cuda()"""
 
 class Conv2DBatchNorm(nn.Module):
     def __init__(self, in_channels, out_channels, k_size,
@@ -29,10 +29,11 @@ class Conv2DBatchNorm(nn.Module):
         """
         super(Conv2DBatchNorm, self).__init__()
         conv1 = nn.Conv2d(in_channels, out_channels, k_size, stride, padding, bias = bias)
+        relu = nn.ReLU(inplace=True)
         if batch_norm:
-            self.unit = nn.Sequential(conv1, nn.BatchNorm2d(out_channels))
+            self.unit = nn.Sequential(conv1, nn.BatchNorm2d(out_channels),relu)
         else:
-            self.unit = nn.Sequential(conv1)
+            self.unit = nn.Sequential(conv1,relu)
 
     def forward(self, x):
         x = self.unit(x)

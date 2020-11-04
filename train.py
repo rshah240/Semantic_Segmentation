@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 train_on_gpu = torch.cuda.is_available()
 def train(retraining = False):
     """Training Function for training Segnet Architecture"""
-    PATH = './Segnet.pth'
+    PATH = './Segnet_2.pth'
     writer = SummaryWriter("logs/Semantic_Segmentation_Experiment_1")
     model = Segnet()
 
@@ -52,7 +52,7 @@ def train(retraining = False):
             loss.backward()
             optimizer.step()
             losses.append(loss.item())
-        writer.add_scalar('Training_loss',sum(losses)/(i+1),(i+1))
+        writer.add_scalar('Training_loss',sum(losses)/((i+1)*(400/hyperparmeters.batch_size)),(i+1))
         if i % 10 == 0:
             print("Epochs : {}/{} Loss: {:.2f}".format(i,epochs,loss.item()))
     writer.close()
@@ -65,7 +65,7 @@ def train(retraining = False):
 
 
 if __name__ == "__main__":
-    train(True)
+    train(False)
 
 
 

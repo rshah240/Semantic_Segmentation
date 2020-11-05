@@ -3,9 +3,8 @@ import torch.optim as optim
 import torch.nn as nn
 from utils import Segnet
 import utils
-
+import argparse
 import hyperparmeters
-import os
 from torch.utils.tensorboard import SummaryWriter
 
 train_on_gpu = torch.cuda.is_available()
@@ -65,7 +64,12 @@ def train(retraining = False):
 
 
 if __name__ == "__main__":
-    train(False)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--retraining', type=bool, required=False,default=False, help='Bool Value to retrain the model '
+                                                                                     'or not')
+    args = parser.parse_args()
+    retraining = args.retraining
+    train(retraining)
 
 
 

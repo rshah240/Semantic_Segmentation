@@ -3,9 +3,8 @@ import torch.optim as optim
 import torch.nn as nn
 from utils import UNet
 import utils
-
+import argparse
 import hyperparmeters
-import os
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -59,4 +58,9 @@ def train(retraining = False):
 
 
 if __name__ == "__main__":
-    train(True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--retraining',type=bool, required=False, default=False, help='Bool Value to retrain the model '
+                                                                                      'or not')
+    args = parser.parse_args()
+    retraining = args.retraining
+    train(retraining)
